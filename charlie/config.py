@@ -2,6 +2,7 @@
 import os
 from dotenv import load_dotenv
 from groq import Groq
+import sounddevice as sd
 
 load_dotenv()
 
@@ -25,8 +26,11 @@ PARTIAL_MATCH_THRESHOLD = 0.5
 ON_TOPIC_MATCH_THRESHOLD = 0.9
 
 # stt config
-DEFAULT_DURATION = 4.0
-SAMPLE_RATE = 48000
+def get_device_sample_rate():
+    device_info = sd.query_devices(kind="input")
+    SAMPLE_RATE = int(device_info["default_samplerate"])
+    return SAMPLE_RATE
+SAMPLE_RATE = get_device_sample_rate()
 CHANNELS = 1
 STT_MODEL = "whisper-large-v3-turbo"
 STT_LANGUAGE = "en"

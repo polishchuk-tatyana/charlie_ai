@@ -163,4 +163,5 @@ cython_debug/
 .venv_cpython/
 .data/
 log/
+records/
 *.pem
