@@ -2,7 +2,7 @@
 
 A Python implementation of the core lesson logic for **Charlie AI**, a voice-based English teacher for children aged 4–8. Charlie is a playful 8-year-old fox from London who guides a child through a short vocabulary lesson.
 
-This repo implements the **text-only core** (per the task brief): the service accepts what the child typed, drives the lesson flow, and generates Charlie's response through an LLM.
+This repo implements the service accepts what the child typed, drives the lesson flow, and generates Charlie's response through an LLM.
 Voice I/O (STT/TTS) can be plugged in later.
 
 ## Quick start
