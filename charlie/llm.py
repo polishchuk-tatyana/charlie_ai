@@ -1,14 +1,6 @@
 import os
-
-from charlie.config import LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE
-from dotenv import load_dotenv
-from groq import Groq
-
-load_dotenv()
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
-
+from charlie.config import LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE, STT_MODEL, STT_LANGUAGE, client
+from log_handler import logger as log
 
 def request_to_groq(prompt: str, history: list, user_msg: str, temperature: float = LLM_TEMPERATURE) -> str:
     messages: list = [{"role": "system", "content": prompt}]
@@ -21,3 +13,18 @@ def request_to_groq(prompt: str, history: list, user_msg: str, temperature: floa
         max_completion_tokens=LLM_MAX_TOKENS
     )
     return str(chat_completion.choices[0].message.content)
+
+# for sst
+def transcribe(wav_path: str) -> str:
+    # read binary data (`rb`) from .wav file and convert into text
+    with open(wav_path, "rb") as f:
+        transcription = client.audio.transcriptions.create(
+            file=(os.path.basename(wav_path), f.read()),
+            model=STT_MODEL,
+            language=STT_LANGUAGE,
+            temperature=0,
+            response_format="text",
+        )
+    text = str(transcription).strip()
+    log.info(f"Transcribed: {text!r}")
+    return text

@@ -146,9 +146,10 @@ Everything else — words, model IDs, thresholds, max tokens — lives in `charl
 - **More phases:** add a value to the `Phase` enum, add an entry to `PHASE_INSTRUCTIONS`, and add the transition in `LessonManager.__switch_phase`.
 - **Different reaction styles:** adjust `PRACTICE_INSTRUCTIONS[category]` — no code changes needed.
 
-## Future work
+## Voice I/O
 
-- **Voice I/O.** The text core was the deliverable, but the same `LessonManager` can sit behind speech-to-text (e.g. Groq `whisper-large-v3-turbo`) on the input side and text-to-speech (e.g. Groq `playai-tts`) on the output side. The core doesn't know or care where the text comes from — adding voice is a thin adapter above `process_conversation`.
-- **Tests.** Unit tests for phase transitions (with a mocked LLM) and for the classifier on a small corpus of real-world-ish child inputs.
-- **Evaluation harness.** A small set of scripted "bad" child transcripts (silent, off-topic, partial) with expected Charlie behaviour, so prompt changes can be regression-tested.
-- **Structured-output mode.** Try the single-call JSON approach behind a flag and A/B against the two-call baseline on latency and classification accuracy.
+The lesson core is text-only by design, but the project includes scaffolding for a full voice cycle.
+
+**Speech-to-text** (`charlie/stt.py`) — records audio from the microphone with `sounddevice` using a push-to-talk style (start on call, stop on Enter), saves the stream to a temporary WAV, and transcribes it through Groq `whisper-large-v3-turbo`. `record_and_transcribe()` returns a clean string ready to be passed into `LessonManager.process_conversation`. STT is not wired into `main.py` yet — the CLI still reads from `input()`.
+
+**Text-to-speech** (`charlie/tts.py`) — will feed Charlie's reply to Groq `playai-tts` and play the resulting audio back to the child. Since `process_conversation` already returns a plain string, TTS is a thin adapter on the output side — symmetrical to STT on the input side. Once both are done, `main.py` will gain a `--voice` flag that swaps `input()` for the microphone and `print()` for playback, keeping the text mode as the default.
