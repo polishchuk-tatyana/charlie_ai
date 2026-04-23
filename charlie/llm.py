@@ -1,5 +1,10 @@
 import os
-from charlie.config import LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE, STT_MODEL, STT_LANGUAGE, client
+from charlie.config import (
+    LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE,
+    STT_MODEL, STT_LANGUAGE,
+    TTS_MODEL, TTS_VOICE,
+    client,
+)
 from log_handler import logger as log
 
 def request_to_groq(prompt: str, history: list, user_msg: str, temperature: float = LLM_TEMPERATURE) -> str:
@@ -28,3 +33,15 @@ def transcribe(wav_path: str) -> str:
     text = str(transcription).strip()
     log.info(f"Transcribed: {text!r}")
     return text
+
+# for tts
+def tts_stream(text: str):
+    """Open a streaming Groq TTS response. Returns a context manager that yields
+    raw PCM16 chunks at TTS_SAMPLE_RATE; the caller reads them via iter_bytes().
+    """
+    return client.audio.speech.with_streaming_response.create(
+        model=TTS_MODEL,
+        voice=TTS_VOICE,
+        response_format="wav",
+        input=text,
+    )

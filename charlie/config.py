@@ -36,5 +36,7 @@ STT_MODEL = "whisper-large-v3-turbo"
 STT_LANGUAGE = "en"
 
 # tts config
-TTS_MODEL = "playai-tts"
-TTS_VOICE = "Fritz-PlayAI"
+TTS_MODEL = "canopylabs/orpheus-v1-english"
+TTS_VOICE = "austin"
+TTS_SAMPLE_RATE = 24000 # Orpheus native output rate
+TTS_CHANNELS = 1

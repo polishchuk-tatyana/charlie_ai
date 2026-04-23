@@ -67,5 +67,3 @@ def _save_wav_to_tmp(audio: np.ndarray) -> str:
     sf.write(path, audio, SAMPLE_RATE, subtype="PCM_16")
     # record stopped, can return path only
     return path
-
-record_and_transcribe()

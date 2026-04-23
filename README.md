@@ -25,10 +25,11 @@ cp .env.example .env
 ```
 
 ### 4. Run
+
+**Text mode (default):**
 ```bash
 python -m main
 ```
-
 Talk to Charlie by typing. Example:
 ```
 > hi
@@ -39,7 +40,19 @@ Look — a cat! Can you say "cat"?
 Yay! Great job! Now — a dog! Say "dog"!
 ...
 ```
-The session ends automatically after the farewell phase.
+
+**Voice mode:**
+```bash
+python -m main --voice
+```
+Charlie's replies are synthesized through Groq TTS and played through your speakers; your answers are captured from the microphone. Each turn:
+1. The prompt `🎤 Speak now... (press Enter to stop)` appears.
+2. Say your answer (e.g. "cat"), then press Enter to end the recording.
+3. Charlie's spoken reply plays back; wait for it to finish before the next turn.
+
+On macOS you may be prompted to grant microphone permission to Terminal / your IDE on the first run — accept it, otherwise the recording will be silent.
+
+The session ends automatically after the farewell phase in either mode.
 
 ## Project layout
 
@@ -149,8 +162,33 @@ Everything else — words, model IDs, thresholds, max tokens — lives in `charl
 
 ## Voice I/O
 
-The lesson core is text-only by design, but the project includes scaffolding for a full voice cycle.
+The lesson core is text-only by design, but the project ships with both sides of a full voice cycle — STT on the way in and streaming TTS on the way out. They are not yet wired into `main.py` (the CLI still uses `input()` / `print()`), but both adapters are standalone and ready to plug in.
 
-**Speech-to-text** (`charlie/stt.py`) — records audio from the microphone with `sounddevice` using a push-to-talk style (start on call, stop on Enter), saves the stream to a temporary WAV, and transcribes it through Groq `whisper-large-v3-turbo`. `record_and_transcribe()` returns a clean string ready to be passed into `LessonManager.process_conversation`. STT is not wired into `main.py` yet — the CLI still reads from `input()`.
+### Speech-to-text (`charlie/stt.py`)
 
-**Text-to-speech** (`charlie/tts.py`) — will feed Charlie's reply to Groq `playai-tts` and play the resulting audio back to the child. Since `process_conversation` already returns a plain string, TTS is a thin adapter on the output side — symmetrical to STT on the input side. Once both are done, `main.py` will gain a `--voice` flag that swaps `input()` for the microphone and `print()` for playback, keeping the text mode as the default.
+Records audio from the microphone with `sounddevice` using a push-to-talk style: the call starts an input stream, the user speaks, pressing Enter stops the recording. The captured samples are saved as a WAV under `records/` (timestamped filename, so each session keeps a replayable trail for debugging) and transcribed through Groq `whisper-large-v3-turbo`. `record_and_transcribe()` returns a clean string ready to be passed into `LessonManager.process_conversation`.
+
+Key choices:
+- **Enter-to-stop** over fixed duration — children don't fit a timer, and silence detection is fragile on young voices.
+- **Native sample rate** (`sd.query_devices(...)['default_samplerate']`) — avoids the classic macOS glitch where requesting 16 kHz on a 48 kHz-only mic yields garbled audio.
+- **Language pinned to English** — Whisper would otherwise burn latency auto-detecting, and on short clips like `"cat"` it often picks wrong.
+
+### Text-to-speech (`charlie/tts.py`)
+
+Streams Charlie's reply from Groq `canopylabs/orpheus-v1-english` (voice `austin`) and plays it live through `sounddevice.OutputStream`. Nothing is written to disk — audio is consumed as it comes over the wire.
+
+The implementation uses three cooperating threads:
+- **Producer** — downloads the HTTP response in 4 KB chunks, skips the WAV header by searching for the `"data"` sub-chunk (the header length is not fixed), and pushes raw PCM bytes into a `queue.Queue`.
+- **Audio callback** — `sounddevice` calls it from its own audio thread every ~20 ms; it pulls bytes from the queue, carries any leftover from the previous callback so samples aren't lost, converts them to `int16`, and writes into the output buffer. On the end-of-stream sentinel it pads with silence and raises `sd.CallbackStop` to stop cleanly.
+- **Main thread** — blocks on a `threading.Event` that the callback sets once playback finishes.
+
+`speak(text)` is a single function call; the threading, synchronization and header skipping are internal.
+
+Key choices:
+- **Streaming over save-to-file** — playback starts after the first few KB instead of waiting for the whole clip; noticeable on slow networks and on longer Charlie replies.
+- **WAV + runtime header skip** — Groq's Orpheus endpoint does not currently accept `response_format="pcm"`, so the producer finds the `"data"` marker itself instead of relying on a fixed 44-byte offset (the real header includes a variable-length `LIST/INFO` chunk).
+- **Playback sample rate slightly above native** — bumping `sd.OutputStream` to ~28800 Hz while Orpheus renders at 24000 Hz makes Charlie sound a bit faster and brighter, which fits a small playful fox better than the default rate.
+
+### Putting it together
+
+`main.py` exposes a `--voice` flag that swaps `input()` for `record_and_transcribe()` and `print()` for `speak()`. The lesson core is unchanged — it still takes a string in and returns a string out; voice is purely an I/O-layer swap on top of the same `LessonManager`.
